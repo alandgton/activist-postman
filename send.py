@@ -1,7 +1,12 @@
 #!/usr/bin/env python3
-import messages, recipients, smtplib, ssl, states, sys, time
+import messages, recipients, smtplib, ssl, states, sys, time, os
 from getpass import getpass
-from email.message import EmailMessage
+from google_auth_oauthlib.flow import InstalledAppFlow
+from googleapiclient.discovery import build
+import pickle
+from apiclient import errors
+from google.auth.transport.requests import Request
+
 
 def print_barrier():
     print("======================================================")
@@ -116,39 +121,84 @@ def prompt_recipients():
 
     return recv
 
+# taken from https://developers.google.com/gmail/api/v1/reference/users/messages/send#python
+# with small edits
+def send_message_oauth(service, user_id, message):
+    """Send an email message.
 
-port = 465 # standard port for SMTP over SSL
-smtp_server = "smtp.gmail.com"
+    Args:
+    service: Authorized Gmail API service instance.
+    user_id: User's email address. The special value "me"
+    can be used to indicate the authenticated user.
+    message: Message to be sent.
 
-recv = prompt_recipients()
-subject, message = prompt_email()
-src_name, src_email, password = prompt_login()
-
-while True:
+    Returns:
+    Sent Message.
+    """
+    print(message)
     try:
-        # create a secure SSL context
-        context = ssl.create_default_context()
+        message = (service.users().messages().send(userId=user_id, body=message)
+                .execute())
+        print ('Message Id: {}'.format(message['id']))
+        return message
+    except errors.HttpError as error:
+        print ('An error occurred: {}'.format(error))
 
-        with smtplib.SMTP_SSL(smtp_server, port, context=context) as server:
-            server.login(src_email, password)
-            while recv:
-                recipient = recv.pop()
-                dst_name = recipient[0]
-                location = recipient[1]
-                dst_email = recipient[2]
 
-                msg = EmailMessage()
 
-                msg['Subject'] = subject if subject else messages.gen_subject()
-                msg['From'] = src_email
-                msg['To'] = dst_email
+if __name__ == '__main__':
+    port = 465 # standard port for SMTP over SSL
+    smtp_server = "smtp.gmail.com"
 
-                body = messages.attach_greeting(dst_name, message) if message else messages.gen_body(src_name, dst_name, location)
-                msg.set_content(body)
-                print(msg.as_string())
+    recv = prompt_recipients()
+    subject, message = prompt_email()
+    src_name, src_email, password = prompt_login()
 
-                server.send_message(msg)
-        break
-    except smtplib.SMTPException:
-        print("Unexpected error... trying again in 10 seconds.")
-        time.sleep(10)
+    use_smtp=False # default to the smtp version
+
+    all_messages = messages.gen_messages(recv, subject, message, src_name, src_email, smtp=use_smtp)
+
+    while True:
+        if use_smtp:
+            try:
+                # create a secure SSL context
+                context = ssl.create_default_context()
+
+                with smtplib.SMTP_SSL(smtp_server, port, context=context) as server:
+                    server.login(src_email, password)
+                    for msg in all_messages:
+                        print(msg.as_string())
+                        server.send_message(msg)
+                break
+            except smtplib.SMTPException:
+                print("Unexpected error... trying again in 10 seconds.")
+                time.sleep(10)
+
+        else:
+
+            #boilerplate mostly from https://developers.google.com/gmail/api/quickstart/python?hl=en_US
+
+            creds = None
+            if os.path.exists('token.pickle'):
+                with open('token.pickle', 'rb') as token:
+                    creds = pickle.load(token)
+
+            # If there are no (valid) credentials available, let the user log in.
+            if not creds or not creds.valid:
+                if creds and creds.expired and creds.refresh_token:
+                    creds.refresh(Request())
+                else:
+                    flow = InstalledAppFlow.from_client_secrets_file(
+                        'client_secret.json',
+                        scopes=['https://www.googleapis.com/auth/gmail.send'])
+                    creds = flow.run_local_server(port=0)
+                # Save the credentials for the next run
+                with open('token.pickle', 'wb') as token:
+                    pickle.dump(creds, token)
+
+            service = build('gmail', 'v1', credentials=creds)
+
+            # Call the Gmail API
+            for msg in all_messages:
+                send_message_oauth(service, 'me', msg)
+            pass
