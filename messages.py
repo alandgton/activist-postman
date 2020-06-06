@@ -1,4 +1,8 @@
 import random
+from email.message import EmailMessage
+from email.mime.text import MIMEText
+import mimetypes
+import base64
 
 """
     Template credit: nomoreracistcops.github.io
@@ -128,3 +132,31 @@ def gen_closing(name):
             "Best",
     ]
     return "\n%s,\n%s" % (random.choice(c), name)
+
+
+def gen_messages(recv, subject, message, src_name, src_email, smtp=False):
+    while recv:
+        recipient = recv.pop()
+        dst_name = recipient[0]
+        location = recipient[1]
+        dst_email = recipient[2]
+
+        subject = subject if subject else gen_subject()
+        body = attach_greeting(dst_name, message) if message else gen_body(src_name, dst_name, location)
+
+        if smtp:
+            msg = EmailMessage()
+            msg['Subject'] = subject
+            msg['From'] = src_email
+            msg['To'] = dst_email
+
+
+            msg.set_content(body)
+        else:
+              message = MIMEText(body)
+              message['to'] = dst_email
+              message['from'] = src_email
+              message['subject'] = subject
+              raw = base64.urlsafe_b64encode(message.as_bytes()).decode()
+              msg = {'raw': raw}
+        yield msg
