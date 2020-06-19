@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import messages, recipients, smtplib, ssl, states, sys, time
+import logging, messages, recipients, smtplib, ssl, states, sys, time
 from getpass import getpass
 from email.message import EmailMessage
 
