@@ -39,7 +39,7 @@ def gen_subject(): #note can this function be used later if its part of the app 
     if random.randint(1,100) > percent_for_list:
         return random.choice(s)
     else:
-        suffix = ["...","...and Many More","...and So Many More","...and Many Others","...and So Many Others"] 
+        suffix = ["...","...and Many More","...and So Many More","...and Many Others","...and So Many Others"]
         return "George Floyd, " + saytheirnames_sublist(4, []) + random.choice(suffix)
 
 
@@ -103,7 +103,7 @@ def gen_rhetorical_questions():
             "What have you done to compel local law enforcement agencies to immediately cease enacting violence on community members?",
             "How are you working on eliminating qualified immunity for police officers that has allowed too many incidents of police misconduct to disappear without consequence?",
     ]
-    
+
     return f"{' '.join(random.sample(q1,k=len(q1)))} {' '.join(random.sample(q2,k=len(q2)))}"
 
 def gen_conclusion(name):
